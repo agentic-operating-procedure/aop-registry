@@ -20,10 +20,11 @@ class Registry:
         self.root = root
         self.catalogue_path = os.path.join(root, "catalogue.json")
         os.makedirs(os.path.join(root, "published"), exist_ok=True)
-        self.catalogue = {"entries": []}
+        self.catalogue = {"entries": [], "revocations": []}
         if os.path.exists(self.catalogue_path):
             with open(self.catalogue_path) as handle:
                 self.catalogue = json.load(handle)
+                self.catalogue.setdefault("revocations", [])
 
     def _save(self):
         with open(self.catalogue_path, "w") as handle:
@@ -63,11 +64,30 @@ class Registry:
         self._save()
         return entry
 
+    def revoke(self, ref: str, scope: str, reason: str, by: str) -> dict:
+        """NM-VER-6: revoke per scope without mutating the historical entry.
+        The revocation is a separate recorded decision; resolve() surfaces it."""
+        if not self.resolve(ref):
+            raise ValueError("refusal: %s is not published" % ref)
+        revocation = {"ref": ref, "scope": scope, "reason": reason, "by": by,
+                      "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+        self.catalogue["revocations"].append(revocation)
+        self._save()
+        return revocation
+
+    def revocation_state(self, ref: str) -> dict | None:
+        """The active revocation for a ref, or None. The most recent wins."""
+        active = [r for r in self.catalogue["revocations"] if r["ref"] == ref]
+        return active[-1] if active else None
+
     def resolve(self, ref: str) -> dict | None:
-        """Resolve an aop ref (domain/AP-ID@vX.Y.Z) to its published entry."""
+        """Resolve an aop ref (domain/AP-ID@vX.Y.Z) to its published entry,
+        with its revocation state attached (NM-VER-6)."""
         for entry in self.catalogue["entries"]:
             if entry["ref"] == ref:
-                return entry
+                resolved = dict(entry)
+                resolved["revocation"] = self.revocation_state(ref)
+                return resolved
         return None
 
     def provenance_chain(self, ref: str, case_corpus_path: str) -> dict:
