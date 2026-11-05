@@ -49,11 +49,18 @@ class Registry:
         with open(artefact_path, "w") as handle:
             handle.write(content)
 
+        lifecycle = doc.get("lifecycle", {})
+        attestation = doc.get("build_attestation")
+        if lifecycle.get("operational_applicability") == "effective" and not attestation:
+            # NM-VER-7 / CC-31: an operationally authorised artefact carries a
+            # valid attestation; the registry refuses unsigned-effective.
+            raise ValueError("refusal: %s claims operational applicability without a build attestation (NM-VER-7, CC-31)" % ref)
         entry = {
             "ref": ref,
             "aop": doc["aop"],
             "version": doc["version"],
-            "lifecycle": doc.get("lifecycle", {}),
+            "build_attestation": attestation,
+            "lifecycle": lifecycle,
             "published_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "content_digest": "sha256:" + hashlib.sha256(content.encode()).hexdigest(),
             "artefact": os.path.relpath(artefact_path, self.root),
