@@ -7,7 +7,7 @@
 | Authority | The catalogue: publication, versioning, provenance chains, discovery |
 | Tier | Registry |
 | Landing wave | 4 |
-| Version | 0.2.0 |
+| Version | 0.2.1 |
 | Status | Stable |
 | Licence | MIT |
 
